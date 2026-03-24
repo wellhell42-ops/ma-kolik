@@ -10,7 +10,7 @@ from mackolik.scrapers.player_stats import (
     fetch_all_player_stats,
 )
 from mackolik.scrapers.team_stats import fetch_team_stats, fetch_team_form
-from mackolik.scrapers.live_scores import fetch_live_scores, fetch_todays_matches
+from mackolik.scrapers.live_scores import fetch_live_scores, fetch_todays_matches, fetch_live_by_date
 
 __all__ = [
     "fetch_standings",
@@ -26,4 +26,5 @@ __all__ = [
     "fetch_team_form",
     "fetch_live_scores",
     "fetch_todays_matches",
+    "fetch_live_by_date",
 ]

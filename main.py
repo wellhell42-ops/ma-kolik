@@ -45,9 +45,16 @@ from mackolik.scrapers import (
     fetch_team_form,
     fetch_live_scores,
     fetch_todays_matches,
+    fetch_live_by_date,
 )
 from mackolik.exporters import export_json, export_csv, export_excel
 from mackolik.models import LeagueData
+from mackolik.demo import (
+    get_sample_standings,
+    get_sample_player_stats,
+    get_sample_matches,
+    get_sample_live_scores,
+)
 
 console = Console()
 
@@ -185,10 +192,14 @@ def display_live_scores(matches: list):
     table.add_column("Durum", width=10, justify="center")
 
     for match in matches:
+        if match.home_score is not None and match.away_score is not None:
+            score = f"{match.home_score} - {match.away_score}"
+        else:
+            score = "- : -"
         table.add_row(
             match.league,
             match.home_team,
-            f"{match.home_score} - {match.away_score}",
+            score,
             match.away_team,
             match.minute,
             match.status,
@@ -281,9 +292,12 @@ def collect_all_data(scraper: MackolikScraper, league_key: str, league_name: str
 @click.option("--all", "fetch_all", is_flag=True, help="Tüm istatistikleri çek")
 @click.option("--format", "-f", "output_format", type=click.Choice(["json", "csv", "excel", "all"]), help="Dışa aktarma formatı")
 @click.option("--output", "-o", "output_dir", default="output", help="Çıktı klasörü")
+@click.option("--date", "match_date", default=None, help="Belirli bir tarih için maçlar (GG/AA/YYYY)")
+@click.option("--demo", is_flag=True, help="Demo modu - örnek verilerle çalıştır")
 @click.option("--verbose", "-v", is_flag=True, help="Detaylı log")
 def main(league, all_leagues, standings, scorers, assists, yellow_cards, red_cards,
-         matches, team_stats, live, today, fetch_all, output_format, output_dir, verbose):
+         matches, team_stats, live, today, fetch_all, output_format, output_dir,
+         match_date, demo, verbose):
     """
     ⚽ Maçkolik İstatistik Toplayıcı
 
@@ -294,8 +308,10 @@ def main(league, all_leagues, standings, scorers, assists, yellow_cards, red_car
         python main.py --league super-lig --all
         python main.py --league premier-league --standings --scorers
         python main.py --live
+        python main.py --date 24/03/2026
         python main.py --all-leagues --all --format excel
         python main.py -l super-lig -s -g -f json
+        python main.py --demo --league super-lig --all
     """
     setup_logging(verbose)
 
@@ -315,6 +331,31 @@ def main(league, all_leagues, standings, scorers, assists, yellow_cards, red_car
             console.print("  python main.py --live")
             return
 
+    # Demo mode
+    if demo:
+        console.print("[bold yellow]⚠ Demo modu - Örnek veriler kullanılıyor[/bold yellow]\n")
+        if live or today:
+            display_live_scores(get_sample_live_scores())
+            return
+
+        demo_league = league or "super-lig"
+        league_info = LEAGUES.get(demo_league, {})
+        league_name = league_info.get("name", demo_league)
+
+        if fetch_all or standings:
+            display_standings(get_sample_standings(demo_league), league_name)
+        if fetch_all or scorers:
+            display_player_stats(get_sample_player_stats(demo_league, "gol-kralligi"), f"{league_name} - Gol Krallığı")
+        if fetch_all or assists:
+            display_player_stats(get_sample_player_stats(demo_league, "asist"), f"{league_name} - Asist")
+        if fetch_all or yellow_cards:
+            display_player_stats(get_sample_player_stats(demo_league, "sari-kart"), f"{league_name} - Sarı Kart")
+        if fetch_all or red_cards:
+            display_player_stats(get_sample_player_stats(demo_league, "kirmizi-kart"), f"{league_name} - Kırmızı Kart")
+        if fetch_all or matches:
+            display_matches(get_sample_matches(demo_league), f"{league_name} - Maçlar")
+        return
+
     with MackolikScraper() as scraper:
         # Live scores
         if live:
@@ -330,6 +371,19 @@ def main(league, all_leagues, standings, scorers, assists, yellow_cards, red_car
             display_live_scores(today_matches)
             if output_format:
                 _export_data({"bugunun_maclari": today_matches}, output_format, output_dir, "bugunun_maclari")
+            return
+
+        # Specific date matches
+        if match_date:
+            try:
+                date_obj = datetime.strptime(match_date, "%d/%m/%Y")
+            except ValueError:
+                console.print("[red]Geçersiz tarih formatı. Kullanım: GG/AA/YYYY[/red]")
+                return
+            date_matches = fetch_live_by_date(scraper, date_obj)
+            display_live_scores(date_matches)
+            if output_format:
+                _export_data({"tarih_maclari": date_matches}, output_format, output_dir, f"maclar_{match_date.replace('/', '-')}")
             return
 
         # Determine which leagues to process
