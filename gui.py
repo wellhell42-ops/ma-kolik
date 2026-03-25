@@ -435,6 +435,8 @@ class MackolikApp:
                 if self.cb_vars["team_stats"].get():
                     data.team_stats = get_sample_team_stats(league_key)
             else:
+                # Try online first, fallback to demo if empty
+                used_fallback = False
                 with MackolikScraper() as scraper:
                     data = LeagueData(league_name=league_name)
                     total = sum(1 for v in self.cb_vars.values() if v.get())
@@ -482,6 +484,29 @@ class MackolikApp:
                         data.team_stats = fetch_team_stats(scraper, league_key)
                         done += 1
 
+                # Check if online scraping returned empty - fallback to demo
+                has_any = (data.standings or data.top_scorers or data.top_assists
+                           or data.yellow_cards or data.red_cards
+                           or data.matches or data.team_stats)
+                if not has_any:
+                    used_fallback = True
+                    self.root.after(0, lambda: self._set_status(
+                        "Site verisi alinamadi, demo veriler yukleniyor...", ORANGE))
+                    if self.cb_vars["standings"].get():
+                        data.standings = get_sample_standings(league_key)
+                    if self.cb_vars["scorers"].get():
+                        data.top_scorers = get_sample_player_stats(league_key, "gol-kralligi")
+                    if self.cb_vars["assists"].get():
+                        data.top_assists = get_sample_player_stats(league_key, "asist")
+                    if self.cb_vars["yellow_cards"].get():
+                        data.yellow_cards = get_sample_player_stats(league_key, "sari-kart")
+                    if self.cb_vars["red_cards"].get():
+                        data.red_cards = get_sample_player_stats(league_key, "kirmizi-kart")
+                    if self.cb_vars["matches"].get():
+                        data.matches = get_sample_matches(league_key)
+                    if self.cb_vars["team_stats"].get():
+                        data.team_stats = get_sample_team_stats(league_key)
+
             self.current_data = data
             self.root.after(0, lambda: self._display_league_data(data))
 
@@ -496,8 +521,11 @@ class MackolikApp:
             summary = ", ".join(parts) if parts else "Veri bulunamadi"
 
             mode = " (Demo)" if self.demo_mode.get() else ""
+            if not self.demo_mode.get() and used_fallback:
+                mode = " (Otomatik Demo - site erisimi basarisiz)"
             self.root.after(0, lambda: self._set_status(
-                f"{league_name} yuklendi: {summary}{mode}", GREEN))
+                f"{league_name} yuklendi: {summary}{mode}",
+                ORANGE if used_fallback else GREEN))
 
         except Exception as e:
             self.root.after(0, lambda: self._set_status(f"Hata: {e}", RED))
@@ -506,19 +534,26 @@ class MackolikApp:
 
     def _fetch_live_data(self):
         try:
+            used_fallback = False
             if self.demo_mode.get():
                 matches = get_sample_live_scores()
             else:
                 with MackolikScraper() as scraper:
                     matches = fetch_live_scores(scraper)
+                if not matches:
+                    used_fallback = True
+                    matches = get_sample_live_scores()
 
             self.live_data = matches
             self.root.after(0, lambda: self._display_live(matches))
             count = len(matches)
             live_count = sum(1 for m in matches if m.status in ("Canli", "live"))
             mode = " (Demo)" if self.demo_mode.get() else ""
+            if not self.demo_mode.get() and used_fallback:
+                mode = " (Otomatik Demo - site erisimi basarisiz)"
+            color = ORANGE if used_fallback else GREEN
             self.root.after(0, lambda: self._set_status(
-                f"{count} mac bulundu, {live_count} canli{mode}", GREEN))
+                f"{count} mac bulundu, {live_count} canli{mode}", color))
 
         except Exception as e:
             self.root.after(0, lambda: self._set_status(f"Hata: {e}", RED))
@@ -527,18 +562,25 @@ class MackolikApp:
 
     def _fetch_today_data(self):
         try:
+            used_fallback = False
             if self.demo_mode.get():
                 matches = get_sample_live_scores()
             else:
                 with MackolikScraper() as scraper:
                     matches = fetch_todays_matches(scraper)
+                if not matches:
+                    used_fallback = True
+                    matches = get_sample_live_scores()
 
             self.live_data = matches
             self.root.after(0, lambda: self._display_live(matches))
             count = len(matches)
             mode = " (Demo)" if self.demo_mode.get() else ""
+            if not self.demo_mode.get() and used_fallback:
+                mode = " (Otomatik Demo - site erisimi basarisiz)"
+            color = ORANGE if used_fallback else GREEN
             self.root.after(0, lambda: self._set_status(
-                f"Bugun {count} mac bulundu{mode}", GREEN))
+                f"Bugun {count} mac bulundu{mode}", color))
 
         except Exception as e:
             self.root.after(0, lambda: self._set_status(f"Hata: {e}", RED))
