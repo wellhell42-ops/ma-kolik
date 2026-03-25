@@ -54,6 +54,7 @@ from mackolik.demo import (
     get_sample_player_stats,
     get_sample_matches,
     get_sample_live_scores,
+    get_sample_team_stats,
 )
 
 console = Console()

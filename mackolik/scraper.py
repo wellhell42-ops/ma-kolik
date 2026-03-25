@@ -1,22 +1,23 @@
-"""Core scraper engine for Maçkolik."""
+"""Core scraper engine - Pro Version with enhanced anti-detection."""
 
 import time
 import logging
+import random
 from typing import Optional
 
 import requests
 from bs4 import BeautifulSoup
 
-from mackolik.config import BASE_URL, HEADERS, REQUEST_TIMEOUT, REQUEST_DELAY
+from mackolik.config import BASE_URL, HEADERS, API_HEADERS, REQUEST_TIMEOUT, REQUEST_DELAY
 
 logger = logging.getLogger(__name__)
 
 MAX_RETRIES = 3
-BACKOFF_BASE = 2  # seconds
+BACKOFF_BASE = 2
 
 
 class MackolikScraper:
-    """HTTP client with rate limiting, retry logic, and multi-source support for Maçkolik."""
+    """HTTP client with rate limiting, retry logic, and anti-detection for Mackolik."""
 
     def __init__(self, delay: float = REQUEST_DELAY, max_retries: int = MAX_RETRIES):
         self.session = requests.Session()
@@ -26,14 +27,15 @@ class MackolikScraper:
         self._last_request_time = 0.0
 
     def _wait(self):
-        """Respect rate limiting between requests."""
+        """Rate limiting with randomized delay to avoid detection."""
         elapsed = time.time() - self._last_request_time
-        if elapsed < self.delay:
-            time.sleep(self.delay - elapsed)
+        wait = self.delay + random.uniform(0.3, 1.2)
+        if elapsed < wait:
+            time.sleep(wait - elapsed)
 
     def get(self, url: str, params: Optional[dict] = None,
             headers: Optional[dict] = None) -> Optional[requests.Response]:
-        """Make a GET request with rate limiting, retry, and error handling."""
+        """GET request with rate limiting, retry, and error handling."""
         full_url = url if url.startswith("http") else f"{BASE_URL}{url}"
 
         for attempt in range(self.max_retries):
@@ -42,7 +44,7 @@ class MackolikScraper:
                 merged_headers = {**self.session.headers, **(headers or {})}
                 response = self.session.get(
                     full_url, params=params, headers=merged_headers,
-                    timeout=REQUEST_TIMEOUT,
+                    timeout=REQUEST_TIMEOUT, allow_redirects=True,
                 )
                 self._last_request_time = time.time()
                 response.raise_for_status()
@@ -65,6 +67,9 @@ class MackolikScraper:
                     )
                     if attempt < self.max_retries - 1:
                         time.sleep(wait_time)
+                elif status == 403:
+                    logger.warning(f"HTTP 403 (blocked) for {full_url}")
+                    return None
                 else:
                     logger.error(f"HTTP {status} for {full_url}: {e}")
                     return None
@@ -85,7 +90,8 @@ class MackolikScraper:
     def get_json(self, url: str, params: Optional[dict] = None,
                  headers: Optional[dict] = None) -> Optional[dict]:
         """Fetch JSON data from an API endpoint."""
-        response = self.get(url, params, headers=headers)
+        merged = {**API_HEADERS, **(headers or {})}
+        response = self.get(url, params, headers=merged)
         if response is None:
             return None
         try:
@@ -95,7 +101,6 @@ class MackolikScraper:
             return None
 
     def close(self):
-        """Close the session."""
         self.session.close()
 
     def __enter__(self):
