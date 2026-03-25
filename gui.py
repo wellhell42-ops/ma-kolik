@@ -158,7 +158,7 @@ class MackolikApp:
         pad = {"padx": 15, "pady": 5}
 
         # League selection
-        ttk.Label(parent, text="Lig Seçimi", style="CardTitle.TLabel").pack(**pad, anchor="w", pady=(15, 5))
+        ttk.Label(parent, text="Lig Seçimi", style="CardTitle.TLabel").pack(padx=15, anchor="w", pady=(15, 5))
 
         league_names = {k: v["name"] for k, v in LEAGUES.items()}
         self.league_var = tk.StringVar(value="super-lig")
