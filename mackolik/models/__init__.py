@@ -74,8 +74,8 @@ class TeamStats:
 class LiveMatch:
     home_team: str
     away_team: str
-    home_score: int = 0
-    away_score: int = 0
+    home_score: Optional[int] = 0
+    away_score: Optional[int] = 0
     minute: str = ""
     league: str = ""
     status: str = ""

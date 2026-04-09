@@ -20,5 +20,8 @@ setup(
         "console_scripts": [
             "mackolik=main:main",
         ],
+        "gui_scripts": [
+            "mackolik-gui=gui:main",
+        ],
     },
 )
